@@ -1,360 +1,347 @@
+/**
+ * VideoForge - نسخة FFmpeg فقط (بدون Puppeteer)
+ *
+ * التثبيت:
+ *   npm uninstall puppeteer
+ *   npm install express multer cors @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
+ *
+ * نفس الـ endpoint: POST /generate-video  (images / audio / intro / outro)
+ * جديد: GET /status/:jobId  لمتابعة التقدم ورابط التحميل
+ */
 const express = require('express');
 const multer = require('multer');
+const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { spawn, spawnSync } = require('child_process');
-const puppeteer = require('puppeteer');
-
-const app = express();
-const port = 3000;
-
-const cors = require('cors');
-app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/output', express.static(path.join(__dirname, 'output')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, 'uploads'));
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + Date.now() + ext);
-  }
-});
-const upload = multer({ storage: storage });
+const crypto = require('crypto');
+const { spawn } = require('child_process');
 
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+let ffprobePath = null;
+try { ffprobePath = require('@ffprobe-installer/ffprobe').path; } catch (_) { /* نستخدم ffmpeg كبديل */ }
 
-// أبقينا الحقول تحسباً لو أرسلها المتصفح حتى لا ينهار، لكننا سنتجاهلها
+// ───────────── الإعدادات ─────────────
+const PORT = process.env.PORT || 3000;
+const MAX_CONCURRENT_JOBS = Number(process.env.MAX_JOBS || 1); // عدد الفيديوهات اللي تترندر مع بعض
+const FPS = 30;
+const WIDTH = 1280;
+const HEIGHT = 720;
+const FIRST_IMAGE_SEC = 15;       // الصورة الأولى تاخد 15 ثانية دايمًا
+const MIN_OTHER_IMAGE_SEC = 2;    // أقل مدة للصور الباقية (حماية لو الصوت قصير)
+const XFADE_SEC = 1.0;            // مدة الانتقال بين الصور
+const MAX_FILE_MB = 100;
+
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const OUTPUT_DIR = path.join(__dirname, 'output');
+const PUBLIC_DIR = path.join(__dirname, 'public');
+[UPLOADS_DIR, OUTPUT_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
+
+// ───────────── Express + رفع الملفات ─────────────
+const app = express();
+app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
+app.use(express.static(PUBLIC_DIR));
+app.use('/output', express.static(OUTPUT_DIR)); // ملاحظة: /uploads لم يعد متاحاً للعامة
+
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const SAFE_EXT = /^\.(jpe?g|png|webp|mp3|wav|m4a|aac|ogg|opus|flac)$/i;
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    let ext = path.extname(file.originalname).toLowerCase();
+    if (!SAFE_EXT.test(ext)) ext = '';
+    cb(null, `${file.fieldname}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_FILE_MB * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'images') {
+      return IMAGE_TYPES.includes(file.mimetype)
+        ? cb(null, true)
+        : cb(new Error('الصور لازم تكون JPG أو PNG أو WEBP'));
+    }
+    if (file.fieldname === 'audio') {
+      return file.mimetype.startsWith('audio/')
+        ? cb(null, true)
+        : cb(new Error('ملف الصوت غير مدعوم'));
+    }
+    cb(null, false); // intro/outro المرفوعة تتجاهل (بنستخدم الثابتة من public)
+  }
+});
+
+// ───────────── أدوات مساعدة ─────────────
+function run(cmd, args) {
+  return new Promise(resolve => {
+    const p = spawn(cmd, args);
+    let out = '', err = '';
+    p.stdout.on('data', d => (out += d));
+    p.stderr.on('data', d => (err += d));
+    p.on('error', e => resolve({ code: -1, out, err: String(e) }));
+    p.on('close', code => resolve({ code, out, err }));
+  });
+}
+
+const hmsToSec = (h, m, s) => Number(h) * 3600 + Number(m) * 60 + parseFloat(s);
+
+/** يرجّع { duration, hasAudio } لأي ملف (بدون تعطيل السيرفر) */
+async function probe(file) {
+  if (ffprobePath) {
+    const r = await run(ffprobePath, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file]);
+    if (r.code === 0) {
+      try {
+        const j = JSON.parse(r.out);
+        const duration = parseFloat(j.format && j.format.duration);
+        const hasAudio = (j.streams || []).some(s => s.codec_type === 'audio');
+        if (duration > 0) return { duration, hasAudio };
+      } catch (_) { /* نكمل للبديل */ }
+    }
+  }
+  const r = await run(ffmpegPath, ['-hide_banner', '-i', file]); // ffmpeg بيرجّع كود خطأ هنا وده طبيعي
+  const m = r.err.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
+  if (!m) throw new Error('تعذّر قراءة مدة الملف: ' + path.basename(file));
+  return { duration: hmsToSec(m[1], m[2], m[3]), hasAudio: /Audio:/.test(r.err) };
+}
+
+/** توزيع مدة الدرس: الصورة الأولى 15 ثانية، والباقي بالتساوي */
+function splitDurations(total, n) {
+  if (n === 1) return [total];
+  let first = FIRST_IMAGE_SEC;
+  // لو الصوت قصير ومش هيكفي الباقي، نقلل الأولى بالقدر الضروري بس
+  const maxFirst = total - (n - 1) * MIN_OTHER_IMAGE_SEC;
+  if (first > maxFirst) first = maxFirst;
+  // لو حتى كده مش كفاية (صور كتير على صوت قصير جدًا) نوزع بالتساوي
+  if (first < MIN_OTHER_IMAGE_SEC) return Array(n).fill(total / n);
+  const rest = (total - first) / (n - 1);
+  return [first, ...Array(n - 1).fill(rest)];
+}
+
+// ───────────── بناء أمر FFmpeg ─────────────
+function buildFfmpegArgs({ introPath, intro, images, audioPath, audioSec, outroPath, outro, outputPath }) {
+  const args = ['-y', '-hide_banner', '-loglevel', 'error', '-nostats', '-progress', 'pipe:1'];
+  const filters = [];
+  const segments = []; // [{v, a}] بالترتيب
+  let idx = 0;
+
+  const normVideo = `scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},setsar=1,fps=${FPS},format=yuv420p`;
+  const normAudio = 'aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo';
+
+  // مقدمة / خاتمة (فيديو + صوت متزامنين بنفس المدة بالظبط)
+  const addClip = (file, info, tag) => {
+    const i = idx++;
+    args.push('-i', file);
+    const d = info.duration.toFixed(3);
+    filters.push(`[${i}:v]${normVideo},tpad=stop_mode=clone:stop_duration=2,trim=duration=${d},setpts=PTS-STARTPTS[v_${tag}]`);
+    if (info.hasAudio) {
+      filters.push(`[${i}:a]${normAudio},apad,atrim=duration=${d},asetpts=PTS-STARTPTS[a_${tag}]`);
+    } else {
+      filters.push(`anullsrc=r=44100:cl=stereo,${normAudio},atrim=duration=${d},asetpts=PTS-STARTPTS[a_${tag}]`);
+    }
+    segments.push({ v: `v_${tag}`, a: `a_${tag}` });
+  };
+
+  if (introPath) addClip(introPath, intro, 'intro');
+
+  // ── الدرس: صور + Ken Burns + انتقال fade ──
+  const n = images.length;
+  const d = splitDurations(audioSec, n);
+  const T = n > 1 ? Math.min(XFADE_SEC, Math.min(...d) / 2) : 0;
+  const imgStart = idx;
+
+  images.forEach((img, i) => {
+    args.push('-i', img.path);
+    idx++;
+    const len = d[i] + (i < n - 1 ? T : 0); // كل صورة تمتد قدر الانتقال عشان المجموع = مدة الصوت
+    const frames = Math.max(2, Math.round(len * FPS));
+    const zoom = i % 2 === 0 ? `1+0.15*on/${frames}` : `1.15-0.15*on/${frames}`; // زوم إن ثم زوم أوت بالتبادل
+    filters.push(
+      `[${imgStart + i}:v]scale=2560:1440:force_original_aspect_ratio=increase,crop=2560:1440,setsar=1,` +
+      `zoompan=z='${zoom}':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=${WIDTH}x${HEIGHT}:fps=${FPS},format=yuv420p[s${i}]`
+    );
+  });
+
+  if (n === 1) {
+    filters.push('[s0]null[vl]');
+  } else {
+    let cur = 's0';
+    let offset = 0;
+    for (let i = 1; i < n; i++) {
+      offset += d[i - 1];
+      const out = i === n - 1 ? 'vl' : `x${i}`;
+      filters.push(`[${cur}][s${i}]xfade=transition=fade:duration=${T.toFixed(3)}:offset=${offset.toFixed(3)}[${out}]`);
+      cur = out;
+    }
+  }
+  const A = audioSec.toFixed(3);
+  filters.push(`[vl]tpad=stop_mode=clone:stop_duration=1,trim=duration=${A},setpts=PTS-STARTPTS[v_lesson]`);
+
+  const audioIdx = idx++;
+  args.push('-i', audioPath);
+  filters.push(`[${audioIdx}:a]${normAudio},apad,atrim=duration=${A},asetpts=PTS-STARTPTS[a_lesson]`);
+  segments.push({ v: 'v_lesson', a: 'a_lesson' });
+
+  if (outroPath) addClip(outroPath, outro, 'outro');
+
+  // ── دمج الأجزاء ──
+  const concatIn = segments.map(s => `[${s.v}][${s.a}]`).join('');
+  filters.push(`${concatIn}concat=n=${segments.length}:v=1:a=1[vout][aout]`);
+
+  args.push(
+    '-filter_complex', filters.join(';'),
+    '-map', '[vout]', '-map', '[aout]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    '-c:a', 'aac', '-b:a', '192k',
+    '-movflags', '+faststart',
+    outputPath
+  );
+  return args;
+}
+
+/** يشغّل FFmpeg ويحدّث النسبة المئوية. يرفض الـ Promise لو الكود != 0 */
+function runFfmpeg(args, totalSec, onProgress) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(ffmpegPath, args);
+    let errTail = '';
+    let buf = '';
+
+    p.stdout.on('data', chunk => {
+      buf += chunk;
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        const m = line.match(/^out_time_(?:us|ms)=(\d+)/); // الاتنين بالميكروثانية
+        if (m) onProgress(Math.min(99, Math.round((Number(m[1]) / 1e6 / totalSec) * 100)));
+      }
+    });
+    p.stderr.on('data', d => { errTail = (errTail + d).slice(-4000); }); // لازم نقرأه وإلا FFmpeg يتعلق
+    p.on('error', reject);
+    p.on('close', code => (code === 0 ? resolve() : reject(new Error('FFmpeg فشل (code ' + code + '): ' + errTail.trim()))));
+  });
+}
+
+// ───────────── طابور المهام ─────────────
+const jobs = new Map();
+const queue = [];
+let running = 0;
+
+function pump() {
+  while (running < MAX_CONCURRENT_JOBS && queue.length) {
+    const job = queue.shift();
+    running++;
+    processJob(job).finally(() => { running--; pump(); });
+  }
+}
+
+async function processJob(job) {
+  const outputFilename = `video_${job.id}.mp4`;
+  const outputPath = path.join(OUTPUT_DIR, outputFilename);
+  try {
+    job.status = 'processing';
+
+    const fixedIntro = path.join(PUBLIC_DIR, 'intro.mp4');
+    const fixedOutro = path.join(PUBLIC_DIR, 'outro.mp4');
+    const introPath = fs.existsSync(fixedIntro) ? fixedIntro : null;
+    const outroPath = fs.existsSync(fixedOutro) ? fixedOutro : null;
+    if (!introPath) console.log('⚠️ intro.mp4 غير موجود في public');
+    if (!outroPath) console.log('⚠️ outro.mp4 غير موجود في public');
+
+    const [intro, outro, audio] = await Promise.all([
+      introPath ? probe(introPath) : null,
+      outroPath ? probe(outroPath) : null,
+      probe(job.audioPath)
+    ]);
+    const audioSec = audio.duration;
+    const totalSec = (intro ? intro.duration : 0) + audioSec + (outro ? outro.duration : 0);
+    console.log(`[${job.id}] مقدمة ${intro ? intro.duration.toFixed(1) : 0}s | درس ${audioSec.toFixed(1)}s | خاتمة ${outro ? outro.duration.toFixed(1) : 0}s | ${job.images.length} صورة`);
+
+    const args = buildFfmpegArgs({
+      introPath, intro, images: job.images, audioPath: job.audioPath, audioSec, outroPath, outro, outputPath
+    });
+
+    let lastLogged = -10;
+    await runFfmpeg(args, totalSec, pct => {
+      job.progress = pct;
+      if (pct - lastLogged >= 10) { lastLogged = pct; console.log(`[${job.id}] ⏳ ${pct}%`); }
+    });
+
+    job.progress = 100;
+    job.status = 'done';
+    job.downloadUrl = `/output/${outputFilename}`;
+    console.log(`[${job.id}] ✅ تم: ${outputFilename}`);
+  } catch (err) {
+    job.status = 'error';
+    job.error = err.message;
+    console.error(`[${job.id}] ❌`, err.message);
+    fs.promises.unlink(outputPath).catch(() => {});
+  } finally {
+    job.finishedAt = Date.now();
+    // نمسح الملفات المرفوعة في كل الأحوال
+    [...job.images.map(i => i.path), job.audioPath].forEach(f => fs.promises.unlink(f).catch(() => {}));
+  }
+}
+
+// تنظيف سجل المهام القديمة (ساعة)
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, j] of jobs) if (j.finishedAt && j.finishedAt < cutoff) jobs.delete(id);
+}, 10 * 60 * 1000).unref();
+
+// ───────────── الـ Endpoints ─────────────
 app.post('/generate-video', upload.fields([
   { name: 'images', maxCount: 15 },
   { name: 'audio', maxCount: 1 },
   { name: 'intro', maxCount: 1 },
   { name: 'outro', maxCount: 1 }
-]), async (req, res) => {
-  try {
-    console.log('\n--- بدأ طلب فيديو جديد (بمقدمة ونهاية ثابتة) ---');
-    if (!req.files['images'] || !req.files['audio']) {
-      return res.status(400).json({ error: 'الصور والصوت للدرس مطلوبة!' });
-    }
+]), (req, res) => {
+  const files = req.files || {};
+  const images = files['images'] ? [...files['images']] : [];
+  const audio = files['audio'] && files['audio'][0];
 
-    const images = req.files['images'];
-    
-    // ترتيب الصور
-    images.sort((a, b) => {
-      const numA = parseInt((a.originalname.match(/\d+/) || [0])[0]);
-      const numB = parseInt((b.originalname.match(/\d+/) || [0])[0]);
-      return numA - numB;
-    });
-    console.log('الترتيب النهائي للصور:');
-    images.forEach((img, idx) => console.log(`صورة ${idx + 1}: ${img.originalname}`));
-
-    const audioPath = req.files['audio'][0].path;
-    
-    // سحب المقدمة والنهاية الثابتة من مجلد public
-    const fixedIntroPath = path.join(__dirname, 'public', 'intro.mp4');
-    const fixedOutroPath = path.join(__dirname, 'public', 'outro.mp4');
-    
-    const introPath = fs.existsSync(fixedIntroPath) ? fixedIntroPath : null;
-    const outroPath = fs.existsSync(fixedOutroPath) ? fixedOutroPath : null;
-
-    if (!introPath) console.log('⚠️ تحذير: لم يتم العثور على intro.mp4 في مجلد public');
-    if (!outroPath) console.log('⚠️ تحذير: لم يتم العثور على outro.mp4 في مجلد public');
-    
-    const outputFilename = `video_${Date.now()}.mp4`;
-    const outputPath = path.join(__dirname, 'output', outputFilename);
-
-    res.json({ message: 'جاري الآن تصميم الفيديو بالكامل في الخلفية! راقب الشاشة السوداء.', downloadUrl: null });
-
-    (async () => {
-      try {
-        let introDurationMs = 0;
-        let introDurationSec = 0;
-        let hasIntroAudio = false;
-        let introUrl = null;
-        
-        if (introPath) {
-          introUrl = `http://localhost:${port}/intro.mp4`; // الرابط الثابت
-          const introMetadata = spawnSync(ffmpegPath, ['-i', introPath]).stderr.toString();
-          hasIntroAudio = introMetadata.includes('Audio:');
-          const durationMatch = introMetadata.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
-          if (durationMatch) {
-             introDurationSec = parseInt(durationMatch[1])*3600 + parseInt(durationMatch[2])*60 + parseFloat(durationMatch[3]);
-          } else {
-             introDurationSec = 3; 
-          }
-          introDurationMs = Math.floor(introDurationSec * 1000);
-          console.log(`طول المقدمة الثابتة: ${introDurationSec.toFixed(2)}s`);
-        }
-
-        const audioMetadata = spawnSync(ffmpegPath, ['-i', audioPath]).stderr.toString();
-        let audioDurationSec = 5; 
-        const audioDurationMatch = audioMetadata.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
-        if (audioDurationMatch) {
-           audioDurationSec = parseInt(audioDurationMatch[1])*3600 + parseInt(audioDurationMatch[2])*60 + parseFloat(audioDurationMatch[3]);
-        }
-        console.log(`طول صوت الدرس: ${audioDurationSec.toFixed(2)}s. عدد الصور: ${images.length}`);
-
-        let outroDurationMs = 0;
-        let outroDurationSec = 0;
-        let hasOutroAudio = false;
-        let outroUrl = null;
-        
-        if (outroPath) {
-          outroUrl = `http://localhost:${port}/outro.mp4`; // الرابط الثابت
-          const outroMetadata = spawnSync(ffmpegPath, ['-i', outroPath]).stderr.toString();
-          hasOutroAudio = outroMetadata.includes('Audio:');
-          const durationMatch = outroMetadata.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
-          if (durationMatch) {
-             outroDurationSec = parseInt(durationMatch[1])*3600 + parseInt(durationMatch[2])*60 + parseFloat(durationMatch[3]);
-          } else {
-             outroDurationSec = 3; 
-          }
-          outroDurationMs = Math.floor(outroDurationSec * 1000);
-          console.log(`طول الخاتمة الثابتة: ${outroDurationSec.toFixed(2)}s`);
-        }
-
-        const imageUrls = images.map(img => `http://localhost:${port}/uploads/${path.basename(img.path)}`);
-
-        const tempHtmlFilename = `temp_render_${Date.now()}.html`;
-        const htmlPath = path.join(__dirname, 'public', tempHtmlFilename);
-        const pageUrl = `http://localhost:${port}/${tempHtmlFilename}`;
-        
-        const imageTags = imageUrls.map((src, i) => 
-           `<img id="img-${i}" class="slideshow-img" src="${src}" style="opacity: ${i === 0 ? 1 : 0};" />`
-        ).join('\n');
-
-        const htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body, html { margin: 0; padding: 0; width: 1280px; height: 720px; overflow: hidden; background-color: #000; }
-              #intro-screen, #lesson-screen, #outro-screen { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; }
-              #lesson-screen { display: none; background-color: #ffffff; position: relative; overflow: hidden; }
-              video { width: 100%; height: 100%; object-fit: cover; }
-              @keyframes kenburns {
-                  0% { transform: scale(1.0) translate(0, 0); }
-                  100% { transform: scale(1.15) translate(-15px, 10px); }
-              }
-              .slideshow-img {
-                  position: absolute;
-                  top: 0; left: 0;
-                  width: 100%; height: 100%;
-                  object-fit: cover;
-                  transition: opacity 1.2s ease-in-out;
-                  animation: kenburns 20s infinite alternate ease-in-out;
-              }
-            </style>
-          </head>
-          <body>
-            ${introUrl ? `<div id="intro-screen"><video id="intro-vid" src="${introUrl}" preload="auto" muted></video></div>` : ''}
-            <div id="lesson-screen" style="${introUrl ? 'display: none;' : 'display: flex;'}">
-              ${imageTags}
-            </div>
-            ${outroUrl ? `<div id="outro-screen" style="display: none;"><video id="outro-vid" src="${outroUrl}" preload="auto" muted></video></div>` : ''}
-            
-            <script>
-              window.renderComplete = false;
-              async function startRecording() {
-                const FPS = 15; 
-                const hasIntro = ${!!introUrl};
-                const hasOutro = ${!!outroUrl};
-                
-                const introFrames = Math.floor(${introDurationSec} * FPS);
-                const lessonFrames = Math.floor(${audioDurationSec} * FPS);
-                const outroFrames = Math.floor(${outroDurationSec} * FPS);
-                
-                const numImages = ${imageUrls.length};
-                const firstImageFrames = Math.min(15 * FPS, lessonFrames);
-                let framesPerRemainingImage = 0;
-                if (numImages > 1) {
-                    const remainingFrames = Math.max(0, lessonFrames - firstImageFrames);
-                    framesPerRemainingImage = remainingFrames / (numImages - 1);
-                }
-                
-                let currentFrame = 0;
-                let currentImgIndex = 0;
-                let phase = hasIntro ? 'intro' : 'lesson';
-                
-                const introVid = document.getElementById('intro-vid');
-                const introScreen = document.getElementById('intro-screen');
-                const lessonScreen = document.getElementById('lesson-screen');
-                const outroVid = document.getElementById('outro-vid');
-                const outroScreen = document.getElementById('outro-screen');
-
-                window.getNextFrame = async () => {
-                  currentFrame++;
-                  
-                  if (phase === 'intro') {
-                    if (currentFrame >= introFrames) {
-                       phase = 'lesson';
-                       currentFrame = 0; 
-                       if(introScreen) introScreen.style.display = 'none';
-                       lessonScreen.style.display = 'flex';
-                       return true; 
-                    }
-                    return new Promise(resolve => {
-                       introVid.onseeked = () => resolve(true);
-                       introVid.currentTime = currentFrame / FPS;
-                    });
-                  }
-
-                  if (phase === 'lesson') {
-                    if (currentFrame >= lessonFrames) {
-                      if (hasOutro) {
-                          phase = 'outro';
-                          currentFrame = 0;
-                          lessonScreen.style.display = 'none';
-                          if (outroScreen) outroScreen.style.display = 'flex';
-                          return true;
-                      } else {
-                          window.renderComplete = true;
-                          return false;
-                      }
-                    }
-                    
-                    if (numImages > 1) {
-                        let newIndex = 0;
-                        if (currentFrame <= firstImageFrames) {
-                            newIndex = 0;
-                        } else {
-                            const passedFrames = currentFrame - firstImageFrames;
-                            newIndex = 1 + Math.floor(passedFrames / framesPerRemainingImage);
-                        }
-                        if (newIndex >= numImages) newIndex = numImages - 1;
-                        if (newIndex !== currentImgIndex) {
-                            document.getElementById('img-' + currentImgIndex).style.opacity = 0;
-                            document.getElementById('img-' + newIndex).style.opacity = 1;
-                            currentImgIndex = newIndex;
-                        }
-                    }
-                    return true; 
-                  }
-                  
-                  if (phase === 'outro') {
-                    if (currentFrame >= outroFrames) {
-                        window.renderComplete = true;
-                        return false;
-                    }
-                    return new Promise(resolve => {
-                        outroVid.onseeked = () => resolve(true);
-                        outroVid.currentTime = currentFrame / FPS;
-                    });
-                  }
-                };
-              }
-            </script>
-          </body>
-          </html>
-        `;
-
-        fs.writeFileSync(htmlPath, htmlContent);
-
-        console.log('جاري فتح المتصفح الخفي...');
-        const browser = await puppeteer.launch({ 
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--allow-file-access-from-files', 
-            '--autoplay-policy=no-user-gesture-required'
-          ]
-        });
-        
-        const page = await browser.newPage();
-        await page.setViewport({ width: 1280, height: 720 });
-        
-        await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 });
-        await new Promise(r => setTimeout(r, 1000));
-        await page.evaluate(() => startRecording());
-
-        const ffmpegArgs = [
-          '-y', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-r', '15', '-i', '-'
-        ];
-
-        let filterInputs = '';
-        let filterMix = '';
-        let inputIndex = 1; 
-        let audioSourcesCount = 0;
-
-        if (introPath && hasIntroAudio) {
-            ffmpegArgs.push('-i', introPath);
-            filterInputs += `[${inputIndex}:a]adelay=0|0[a_intro]; `;
-            filterMix += `[a_intro]`;
-            inputIndex++;
-            audioSourcesCount++;
-        }
-
-        ffmpegArgs.push('-i', audioPath);
-        filterInputs += `[${inputIndex}:a]adelay=${introDurationMs}|${introDurationMs}[a_lesson]; `;
-        filterMix += `[a_lesson]`;
-        inputIndex++;
-        audioSourcesCount++;
-
-        if (outroPath && hasOutroAudio) {
-            ffmpegArgs.push('-i', outroPath);
-            const outroDelayMs = introDurationMs + Math.floor(audioDurationSec * 1000);
-            filterInputs += `[${inputIndex}:a]adelay=${outroDelayMs}|${outroDelayMs}[a_outro]; `;
-            filterMix += `[a_outro]`;
-            inputIndex++;
-            audioSourcesCount++;
-        }
-
-        const filterComplex = `${filterInputs}${filterMix}amix=inputs=${audioSourcesCount}:duration=longest:dropout_transition=0[aout]`;
-        ffmpegArgs.push('-filter_complex', filterComplex);
-        ffmpegArgs.push('-map', '0:v', '-map', '[aout]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-shortest', outputPath);
-
-        console.log('بدأ تصوير وتجميع الفيديو...');
-        const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
-        
-        ffmpegProcess.on('close', (code) => {
-          if (fs.existsSync(htmlPath)) fs.unlinkSync(htmlPath);
-          browser.close();
-          console.log(`✅ انتهى الفيديو بنجاح تام بنسبة 100%! تجده في مجلد output باسم: ${outputFilename}`);
-        });
-
-        let keepRecording = true;
-        let frameCount = 0;
-        
-        const totalFrames = Math.floor((introDurationSec + audioDurationSec + outroDurationSec) * 15);
-        
-        try {
-          while (keepRecording) {
-            const frameBuffer = await page.screenshot({ type: 'jpeg', quality: 90 });
-            
-            if (!ffmpegProcess.stdin.write(frameBuffer)) {
-                await new Promise(r => ffmpegProcess.stdin.once('drain', r));
-            }
-            
-            keepRecording = await page.evaluate(() => window.getNextFrame());
-            frameCount++;
-            
-            if (frameCount % 15 === 0) {
-               const percent = Math.min(100, Math.round((frameCount / totalFrames) * 100));
-               console.log(`⏳ جاري المعالجة: ${percent}% (تم دمج ${frameCount} من ${totalFrames} صورة)`);
-            }
-          }
-        } catch (err) {
-          console.error("حدث خطأ أثناء التصوير:", err);
-        } finally {
-          ffmpegProcess.stdin.end();
-        }
-
-      } catch (error) {
-        console.error("خطأ عام في العملية:", error);
-      }
-    })(); 
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+  if (!images.length || !audio) {
+    [...images, audio].filter(Boolean).forEach(f => fs.promises.unlink(f.path).catch(() => {}));
+    return res.status(400).json({ error: 'الصور والصوت للدرس مطلوبة!' });
   }
+
+  // ترتيب الصور حسب الرقم في اسم الملف
+  const num = f => parseInt((f.originalname.match(/\d+/) || [0])[0], 10);
+  images.sort((a, b) => num(a) - num(b));
+  images.forEach((img, i) => console.log(`صورة ${i + 1}: ${img.originalname}`));
+
+  const job = {
+    id: crypto.randomBytes(6).toString('hex'),
+    status: 'queued',
+    progress: 0,
+    downloadUrl: null,
+    error: null,
+    images,
+    audioPath: audio.path
+  };
+  jobs.set(job.id, job);
+  queue.push(job);
+  pump();
+
+  res.status(202).json({
+    message: 'تم استلام الطلب وجاري تصميم الفيديو في الخلفية.',
+    jobId: job.id,
+    statusUrl: `/status/${job.id}`,
+    downloadUrl: null
+  });
 });
 
-app.listen(port, () => {
-  console.log(`VideoForge Server is running at http://localhost:${port}`);
+app.get('/status/:id', (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: 'المهمة غير موجودة' });
+  res.json({ status: job.status, progress: job.progress, downloadUrl: job.downloadUrl, error: job.error });
+});
+
+// أخطاء multer (حجم/نوع الملف)
+app.use((err, req, res, next) => {
+  if (err) return res.status(400).json({ error: err.message });
+  next();
+});
+
+app.listen(PORT, () => {
+  console.log(`VideoForge Server is running at http://localhost:${PORT}`);
 });
