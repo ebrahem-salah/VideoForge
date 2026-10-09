@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة توليد الفيديو | Node.js + Puppeteer + FFmpeg</title>
+    
+    <!-- استدعاء خطوط Google (خط Cairo ليدعم العربية بشكل رائع) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- استدعاء مكتبة Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- استدعاء مكتبة الأيقونات FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- إعدادات Tailwind لتخصيص الألوان والخطوط -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',    // slate-900
+                            primary: '#06b6d4', // cyan-500
+                            secondary: '#8b5cf6',// violet-500
+                            accent: '#10b981'   // emerald-500
+                        }
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* تنسيقات إضافية لجمالية الكود والتأثيرات الزجاجية */
+        body {
+            background-color: #0f172a; /* خلفية داكنة */
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .gradient-text {
+            background: linear-gradient(to left, #06b6d4, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        /* تنسيق شريط التمرير */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="antialiased relative min-h-screen selection:bg-brand-primary selection:text-white">
+
+    <!-- خلفية حركية ضبابية (Blobs) لإعطاء طابع تقني -->
+    <div class="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 left-1/4 w-72 h-72 bg-brand-secondary rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div class="absolute top-0 right-1/4 w-72 h-72 bg-brand-primary rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-8 left-1/3 w-72 h-72 bg-brand-accent rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <header class="relative z-10 border-b border-white/5 glass-panel sticky top-0">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                    <i class="fa-solid fa-video text-white"></i>
+                </div>
+                <span class="text-xl font-bold tracking-wide">Video<span class="text-brand-primary">Forge</span></span>
+            </div>
+            <nav class="hidden md:flex gap-8 text-sm font-semibold text-gray-300">
+                <a href="#features" class="hover:text-white transition-colors">المميزات</a>
+                <a href="#how-it-works" class="hover:text-white transition-colors">آلية العمل</a>
+                <a href="#use-cases" class="hover:text-white transition-colors">حالات الاستخدام</a>
+            </nav>
+            <button class="bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all border border-white/10 flex items-center gap-2">
+                <i class="fa-brands fa-github"></i> الكود المصدري
+            </button>
+        </div>
+    </header>
+
+    <main class="relative z-10">
+        <!-- قسم البداية (Hero Section) -->
+        <section class="container mx-auto px-6 py-20 lg:py-32 flex flex-col lg:flex-row items-center gap-12">
+            <div class="w-full lg:w-1/2 space-y-8 text-center lg:text-right">
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-brand-primary text-sm font-semibold border border-brand-primary/30">
+                    <span class="w-2 h-2 rounded-full bg-brand-accent animate-pulse"></span>
+                    الجيل القادم من توليد الفيديوهات
+                </div>
+                <h1 class="text-5xl lg:text-7xl font-extrabold leading-tight">
+                    حوّل الـ كود إلى <br>
+                    <span class="gradient-text">فيديو سينمائي</span> بذكاء
+                </h1>
+                <p class="text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                    أطلق العنان لقوة <span class="text-green-400 font-bold">Node.js</span> مع <span class="text-orange-400 font-bold">Puppeteer</span> و <span class="text-blue-400 font-bold">FFmpeg</span> لبناء فيديوهات ديناميكية، دقيقة، واحترافية مباشرة من قوالب الويب (HTML/CSS).
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
+                    <button class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg font-bold text-lg shadow-lg shadow-brand-primary/30 hover:shadow-brand-primary/50 transition-all hover:-translate-y-1">
+                        ابدأ البناء الآن <i class="fa-solid fa-arrow-left mr-2"></i>
+                    </button>
+                    <button class="w-full sm:w-auto px-8 py-4 glass-panel rounded-lg font-bold text-lg hover:bg-white/5 transition-all">
+                        قراءة التوثيق
+                    </button>
+                </div>
+            </div>
+
+            <div class="w-full lg:w-1/2">
+                <div class="glass-panel rounded-2xl p-1 border border-gray-700 shadow-2xl">
+                    <div class="bg-[#1e1e1e] rounded-xl overflow-hidden">
+                        <!-- شريط نافذة محرر الكود -->
+                        <div class="flex items-center px-4 py-3 bg-[#2d2d2d]">
+                            <div class="flex gap-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            </div>
+                            <div class="text-xs text-gray-400 mx-auto font-mono">render-video.js</div>
+                        </div>
+                        <!-- الكود -->
+                        <div class="p-6 text-sm font-mono text-gray-300 overflow-x-auto" dir="ltr">
+<pre><span class="text-pink-500">const</span> <span class="text-blue-400">puppeteer</span> = <span class="text-yellow-200">require</span>(<span class="text-green-400">'puppeteer'</span>);
+<span class="text-pink-500">const</span> <span class="text-blue-400">ffmpeg</span> = <span class="text-yellow-200">require</span>(<span class="text-green-400">'fluent-ffmpeg'</span>);
+
+<span class="text-gray-500">// 1. التقاط إطارات بجودة فائقة باستخدام HTML/CSS</span>
+<span class="text-pink-500">async function</span> <span class="text-blue-300">captureFrames</span>() {
+  <span class="text-pink-500">const</span> browser = <span class="text-pink-500">await</span> puppeteer.<span class="text-yellow-200">launch</span>();
+  <span class="text-pink-500">const</span> page = <span class="text-pink-500">await</span> browser.<span class="text-yellow-200">newPage</span>();
+  <span class="text-pink-500">await</span> page.<span class="text-yellow-200">goto</span>(<span class="text-green-400">'http://localhost:3000/template'</span>);
+  
+  <span class="text-gray-500">// ... حلقة لتصوير الإطارات بدقة</span>
+}
+
+<span class="text-gray-500">// 2. دمج الإطارات والصوت وإخراج فيديو احترافي</span>
+<span class="text-blue-400">ffmpeg</span>()
+  .<span class="text-yellow-200">input</span>(<span class="text-green-400">'frames/frame-%04d.png'</span>)
+  .<span class="text-yellow-200">input</span>(<span class="text-green-400">'voiceover.mp3'</span>)
+  .<span class="text-yellow-200">outputOptions</span>([<span class="text-green-400">'-c:v libx264'</span>, <span class="text-green-400">'-pix_fmt yuv420p'</span>])
+  .<span class="text-yellow-200">save</span>(<span class="text-green-400">'final_output.mp4'</span>);
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- قسم مساحة العمل (رفع الملفات) -->
+        <section id="workspace" class="container mx-auto px-6 py-12 relative z-10">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">مساحة العمل (Workspace)</h2>
+                <p class="text-gray-400 text-lg">قم برفع ملفاتك هنا وسيتولى الخادم السحابي الباقي لإنتاج الفيديو.</p>
+            </div>
+
+            <div class="glass-panel p-8 rounded-3xl border border-white/10 max-w-5xl mx-auto shadow-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- 1. رفع الصور -->
+                    <div class="relative group cursor-pointer">
+                        <input type="file" id="images-upload" multiple accept="image/*" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-brand-primary transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-48">
+                            <i class="fa-solid fa-images text-3xl text-brand-primary mb-3"></i>
+                            <h4 class="font-bold text-lg mb-1">صور الفيديو</h4>
+                            <p class="text-xs text-gray-400">اختر صور متعددة (PNG, JPG)</p>
+                            <span id="images-status" class="mt-3 text-sm font-semibold text-brand-accent hidden"></span>
+                        </div>
+                    </div>
+
+                    <!-- 2. رفع الصوت -->
+                    <div class="relative group cursor-pointer">
+                        <input type="file" id="audio-upload" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-brand-secondary transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-48">
+                            <i class="fa-solid fa-file-audio text-3xl text-brand-secondary mb-3"></i>
+                            <h4 class="font-bold text-lg mb-1">التعليق الصوتي</h4>
+                            <p class="text-xs text-gray-400">اختر ملف صوتي (MP3, WAV)</p>
+                            <span id="audio-status" class="mt-3 text-sm font-semibold text-brand-accent hidden"></span>
+                        </div>
+                    </div>
+
+                    <!-- 3. رفع المقدمة -->
+                    <div class="relative group cursor-pointer">
+                        <input type="file" id="intro-upload" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-pink-500 transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-32">
+                            <i class="fa-solid fa-film text-2xl text-pink-500 mb-2"></i>
+                            <h4 class="font-bold mb-1">فيديو المقدمة (Intro)</h4>
+                            <span id="intro-status" class="text-xs text-brand-accent hidden"></span>
+                        </div>
+                    </div>
+
+                    <!-- 4. رفع النهاية -->
+                    <div class="relative group cursor-pointer">
+                        <input type="file" id="outro-upload" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-orange-500 transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-32">
+                            <i class="fa-solid fa-clapperboard text-2xl text-orange-500 mb-2"></i>
+                            <h4 class="font-bold mb-1">فيديو النهاية (Outro)</h4>
+                            <span id="outro-status" class="text-xs text-brand-accent hidden"></span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="mt-8 text-center">
+                    <button id="trigger-render-btn" class="px-10 py-4 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-xl font-bold text-lg shadow-lg shadow-brand-primary/30 hover:shadow-brand-primary/50 transition-all hover:-translate-y-1 w-full md:w-auto">
+                        <i class="fa-solid fa-gear mr-2"></i> دمج وإنشاء الفيديو الآن
+                    </button>
+                    <p class="text-xs text-gray-500 mt-3">* سيتم إرسال الملفات إلى خوادم Node.js لمعالجتها باستخدام FFmpeg</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- قسم المحاكاة الحية (تأثير مرئي للرندرة) -->
+        <section class="container mx-auto px-6 py-20">
+            <div class="bg-black/50 border border-gray-800 rounded-3xl p-8 lg:p-12 text-center relative overflow-hidden glass-panel">
+                <div class="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-brand-secondary/5"></div>
+                <h3 class="text-3xl font-bold mb-8 relative z-10">شاهد محاكاة عملية المعالجة</h3>
+                
+                <div class="max-w-3xl mx-auto bg-[#0d1117] rounded-xl border border-gray-700 shadow-2xl text-left overflow-hidden relative z-10" dir="ltr">
+                    <div class="flex items-center px-4 py-2 bg-[#161b22] border-b border-gray-700">
+                        <i class="fa-solid fa-terminal text-gray-400 mr-2 text-sm"></i>
+                        <span class="text-xs text-gray-400 font-mono">Terminal - VideoForge</span>
+                    </div>
+                    <div class="p-4 font-mono text-sm h-64 overflow-y-auto" id="terminal-output">
+                        <div class="text-green-400">$ node generate-video.js --template=news_layout</div>
+                        <div class="text-gray-400 mt-1">[10:00:01] <span class="text-blue-400">info:</span> Initializing Puppeteer cluster...</div>
+                        <!-- سيتم إضافة المزيد من الأسطر هنا بواسطة جافاسكربت -->
+                    </div>
+                </div>
+                
+                <button id="start-render-btn" class="hidden mt-8 relative z-10 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors">
+                    <i class="fa-solid fa-play mr-2"></i> بدء عملية الرندرة الوهمية
+                </button>
+            </div>
+        </section>
+
+        <!-- الفوتر -->
+        <footer class="border-t border-white/10 mt-20 pt-10 pb-6 glass-panel">
+            <div class="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-video text-brand-primary"></i>
+                    <span class="text-lg font-bold">Video<span class="text-brand-primary">Forge</span></span>
+                </div>
+                <p class="text-sm text-gray-500">تم التصميم باستخدام تقنيات الويب الحديثة لتوضيح قوة دمج Node.js و متصفحات الويب الوهمية.</p>
+                <div class="flex gap-4">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors"><i class="fa-brands fa-github text-xl"></i></a>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- سكربت المحاكاة (لإعطاء تأثير جمالي في واجهة التيرمينال) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const terminalOutput = document.getElementById('terminal-output');
+            const startBtn = document.getElementById('start-render-btn'); // الزر القديم مخفي الآن
+            const triggerRenderBtn = document.getElementById('trigger-render-btn'); // الزر الجديد
+            
+            // إدارة اختيار الملفات لتحديث الواجهة
+            const handleFileInput = (inputId, statusId, isMultiple = false) => {
+                const input = document.getElementById(inputId);
+                const status = document.getElementById(statusId);
+                
+                input.addEventListener('change', (e) => {
+                    if(e.target.files.length > 0) {
+                        status.classList.remove('hidden');
+                        if(isMultiple) {
+                            status.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> تم اختيار ${e.target.files.length} صور`;
+                        } else {
+                            status.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> تم اختيار الملف: ${e.target.files[0].name.substring(0, 15)}...`;
+                        }
+                    }
+                });
+            };
+
+            handleFileInput('images-upload', 'images-status', true);
+            handleFileInput('audio-upload', 'audio-status');
+            handleFileInput('intro-upload', 'intro-status');
+            handleFileInput('outro-upload', 'outro-status');
+
+            // دالة لإضافة نصوص للتيرمينال
+            const addLog = (text, className = "text-gray-400") => {
+                const div = document.createElement('div');
+                div.className = `${className} mt-1`;
+                div.innerHTML = text;
+                terminalOutput.appendChild(div);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            };
+
+            let isRunning = false;
+
+            triggerRenderBtn.addEventListener('click', async () => {
+                if (isRunning) return;
+                
+                const imageFiles = document.getElementById('images-upload').files;
+                const audioFile = document.getElementById('audio-upload').files[0];
+                const introFile = document.getElementById('intro-upload').files[0];
+                const outroFile = document.getElementById('outro-upload').files[0];
+
+                if (imageFiles.length === 0 || !audioFile) {
+                    alert("يرجى اختيار الصور وملف الصوت على الأقل!");
+                    return;
+                }
+
+                // التمرير السلس إلى قسم المحاكاة
+                document.getElementById('terminal-output').parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                isRunning = true;
+                terminalOutput.innerHTML = `<div class="text-green-400">$ node generate-video.js --process=full_stack</div>`;
+                triggerRenderBtn.disabled = true;
+                triggerRenderBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                triggerRenderBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> جاري رفع الملفات ومعالجتها...';
+
+                // إعداد البيانات للإرسال إلى الخادم الحقيقي
+                const formData = new FormData();
+                for (let i = 0; i < imageFiles.length; i++) {
+                    formData.append('images', imageFiles[i]);
+                }
+                formData.append('audio', audioFile);
+                if (introFile) formData.append('intro', introFile);
+                if (outroFile) formData.append('outro', outroFile);
+
+                addLog("[Client] <span class='text-blue-400'>info:</span> جاري إرسال الملفات إلى خادم Node.js...", "text-gray-400");
+
+                try {
+                    // الاتصال الحقيقي بخادم Node.js الخاص بنا
+                    const response = await fetch('http://localhost:3000/generate-video', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    addLog("[Server] <span class='text-yellow-400'>process:</span> يتم الآن دمج الصور والصوت بواسطة FFmpeg...", "text-gray-400");
+                    
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        addLog(`[Server] <span class='text-green-400'>success:</span> ${result.message} 🚀`, "text-green-400");
+                        addLog(`[Client] <span class='text-brand-primary'>system:</span> الفيديو جاهز للتحميل.`);
+                        
+                        triggerRenderBtn.innerHTML = '<i class="fa-solid fa-download mr-2"></i> تحميل الفيديو النهائي';
+                        triggerRenderBtn.classList.replace('from-brand-primary', 'from-green-500');
+                        triggerRenderBtn.classList.replace('to-brand-secondary', 'to-emerald-600');
+                        triggerRenderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        triggerRenderBtn.disabled = false;
+
+                        // تغيير وظيفة الزر ليقوم بتحميل الملف
+                        triggerRenderBtn.onclick = () => {
+                            window.open(`http://localhost:3000${result.downloadUrl}`, '_blank');
+                        };
+                    } else {
+                        throw new Error(result.error || 'حدث خطأ غير معروف');
+                    }
+                } catch (error) {
+                    addLog(`[Error] <span class='text-red-500'>فشل:</span> ${error.message}`, "text-red-400");
+                    triggerRenderBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> فشل العملية';
+                    triggerRenderBtn.classList.replace('from-brand-primary', 'from-red-500');
+                    triggerRenderBtn.classList.replace('to-brand-secondary', 'to-red-700');
+                } finally {
+                    isRunning = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

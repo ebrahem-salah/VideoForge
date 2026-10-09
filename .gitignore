@@ -1,0 +1,6 @@
+node_modules/
+uploads/*
+!uploads/.gitkeep
+output/*
+!output/.gitkeep
+public/temp_render_*.html
