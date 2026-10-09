@@ -3,31 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة توليد الفيديو | Node.js + Puppeteer + FFmpeg</title>
-    
-    <!-- استدعاء خطوط Google (خط Cairo ليدعم العربية بشكل رائع) -->
+    <title>منصة توليد الفيديو | VideoForge</title>
+
+    <!-- خط Cairo ليدعم العربية بشكل رائع -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- استدعاء مكتبة Tailwind CSS -->
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- استدعاء مكتبة الأيقونات FontAwesome -->
+
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- إعدادات Tailwind لتخصيص الألوان والخطوط -->
+
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Cairo', 'sans-serif'],
-                    },
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
                     colors: {
                         brand: {
-                            dark: '#0f172a',    // slate-900
-                            primary: '#06b6d4', // cyan-500
-                            secondary: '#8b5cf6',// violet-500
-                            accent: '#10b981'   // emerald-500
+                            dark: '#0f172a',
+                            primary: '#06b6d4',
+                            secondary: '#8b5cf6',
+                            accent: '#10b981'
                         }
                     },
                     animation: {
@@ -48,46 +45,30 @@
     </script>
 
     <style>
-        /* تنسيقات إضافية لجمالية الكود والتأثيرات الزجاجية */
-        body {
-            background-color: #0f172a; /* خلفية داكنة */
-            color: #f8fafc;
-            overflow-x: hidden;
-        }
-        
+        body { background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
         .glass-panel {
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-
         .gradient-text {
             background: linear-gradient(to left, #06b6d4, #8b5cf6);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
         }
-
-        /* تنسيق شريط التمرير */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
     </style>
 </head>
 <body class="antialiased relative min-h-screen selection:bg-brand-primary selection:text-white">
 
-    <!-- خلفية حركية ضبابية (Blobs) لإعطاء طابع تقني -->
+    <!-- خلفية حركية ضبابية -->
     <div class="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
         <div class="absolute top-0 left-1/4 w-72 h-72 bg-brand-secondary rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         <div class="absolute top-0 right-1/4 w-72 h-72 bg-brand-primary rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
@@ -114,7 +95,7 @@
     </header>
 
     <main class="relative z-10">
-        <!-- قسم البداية (Hero Section) -->
+        <!-- Hero -->
         <section class="container mx-auto px-6 py-20 lg:py-32 flex flex-col lg:flex-row items-center gap-12">
             <div class="w-full lg:w-1/2 space-y-8 text-center lg:text-right">
                 <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-brand-primary text-sm font-semibold border border-brand-primary/30">
@@ -122,16 +103,16 @@
                     الجيل القادم من توليد الفيديوهات
                 </div>
                 <h1 class="text-5xl lg:text-7xl font-extrabold leading-tight">
-                    حوّل الـ كود إلى <br>
+                    حوّل الصور والصوت إلى <br>
                     <span class="gradient-text">فيديو سينمائي</span> بذكاء
                 </h1>
                 <p class="text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                    أطلق العنان لقوة <span class="text-green-400 font-bold">Node.js</span> مع <span class="text-orange-400 font-bold">Puppeteer</span> و <span class="text-blue-400 font-bold">FFmpeg</span> لبناء فيديوهات ديناميكية، دقيقة، واحترافية مباشرة من قوالب الويب (HTML/CSS).
+                    أطلق العنان لقوة <span class="text-green-400 font-bold">Node.js</span> مع <span class="text-blue-400 font-bold">FFmpeg</span> لبناء فيديوهات ديناميكية ودقيقة واحترافية من صورك وتعليقك الصوتي، مع مقدمة وخاتمة ثابتتين.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
-                    <button class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg font-bold text-lg shadow-lg shadow-brand-primary/30 hover:shadow-brand-primary/50 transition-all hover:-translate-y-1">
+                    <a href="#workspace" class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg font-bold text-lg shadow-lg shadow-brand-primary/30 hover:shadow-brand-primary/50 transition-all hover:-translate-y-1 text-center">
                         ابدأ البناء الآن <i class="fa-solid fa-arrow-left mr-2"></i>
-                    </button>
+                    </a>
                     <button class="w-full sm:w-auto px-8 py-4 glass-panel rounded-lg font-bold text-lg hover:bg-white/5 transition-all">
                         قراءة التوثيق
                     </button>
@@ -141,7 +122,6 @@
             <div class="w-full lg:w-1/2">
                 <div class="glass-panel rounded-2xl p-1 border border-gray-700 shadow-2xl">
                     <div class="bg-[#1e1e1e] rounded-xl overflow-hidden">
-                        <!-- شريط نافذة محرر الكود -->
                         <div class="flex items-center px-4 py-3 bg-[#2d2d2d]">
                             <div class="flex gap-2">
                                 <div class="w-3 h-3 rounded-full bg-red-500"></div>
@@ -150,26 +130,17 @@
                             </div>
                             <div class="text-xs text-gray-400 mx-auto font-mono">render-video.js</div>
                         </div>
-                        <!-- الكود -->
                         <div class="p-6 text-sm font-mono text-gray-300 overflow-x-auto" dir="ltr">
-<pre><span class="text-pink-500">const</span> <span class="text-blue-400">puppeteer</span> = <span class="text-yellow-200">require</span>(<span class="text-green-400">'puppeteer'</span>);
-<span class="text-pink-500">const</span> <span class="text-blue-400">ffmpeg</span> = <span class="text-yellow-200">require</span>(<span class="text-green-400">'fluent-ffmpeg'</span>);
+<pre><span class="text-gray-500">// صور → حركة Zoom + انتقالات → دمج مع الصوت</span>
+<span class="text-pink-500">const</span> <span class="text-blue-400">args</span> = [
+  <span class="text-green-400">'-i'</span>, <span class="text-green-400">'intro.mp4'</span>,
+  <span class="text-green-400">'-i'</span>, <span class="text-green-400">'slide-1.jpg'</span>,
+  <span class="text-green-400">'-i'</span>, <span class="text-green-400">'voiceover.mp3'</span>,
+  <span class="text-green-400">'-filter_complex'</span>, <span class="text-green-400">'zoompan + xfade + concat'</span>,
+  <span class="text-green-400">'-c:v'</span>, <span class="text-green-400">'libx264'</span>, <span class="text-green-400">'final_output.mp4'</span>
+];
 
-<span class="text-gray-500">// 1. التقاط إطارات بجودة فائقة باستخدام HTML/CSS</span>
-<span class="text-pink-500">async function</span> <span class="text-blue-300">captureFrames</span>() {
-  <span class="text-pink-500">const</span> browser = <span class="text-pink-500">await</span> puppeteer.<span class="text-yellow-200">launch</span>();
-  <span class="text-pink-500">const</span> page = <span class="text-pink-500">await</span> browser.<span class="text-yellow-200">newPage</span>();
-  <span class="text-pink-500">await</span> page.<span class="text-yellow-200">goto</span>(<span class="text-green-400">'http://localhost:3000/template'</span>);
-  
-  <span class="text-gray-500">// ... حلقة لتصوير الإطارات بدقة</span>
-}
-
-<span class="text-gray-500">// 2. دمج الإطارات والصوت وإخراج فيديو احترافي</span>
-<span class="text-blue-400">ffmpeg</span>()
-  .<span class="text-yellow-200">input</span>(<span class="text-green-400">'frames/frame-%04d.png'</span>)
-  .<span class="text-yellow-200">input</span>(<span class="text-green-400">'voiceover.mp3'</span>)
-  .<span class="text-yellow-200">outputOptions</span>([<span class="text-green-400">'-c:v libx264'</span>, <span class="text-green-400">'-pix_fmt yuv420p'</span>])
-  .<span class="text-yellow-200">save</span>(<span class="text-green-400">'final_output.mp4'</span>);
+<span class="text-pink-500">await</span> <span class="text-yellow-200">runFfmpeg</span>(args, totalSec, onProgress);
 </pre>
                         </div>
                     </div>
@@ -177,56 +148,50 @@
             </div>
         </section>
 
-        <!-- قسم مساحة العمل (رفع الملفات) -->
+        <!-- مساحة العمل -->
         <section id="workspace" class="container mx-auto px-6 py-12 relative z-10">
             <div class="text-center mb-12">
                 <h2 class="text-3xl md:text-4xl font-bold mb-4">مساحة العمل (Workspace)</h2>
-                <p class="text-gray-400 text-lg">قم برفع ملفاتك هنا وسيتولى الخادم السحابي الباقي لإنتاج الفيديو.</p>
+                <p class="text-gray-400 text-lg">قم برفع ملفاتك هنا وسيتولى الخادم الباقي لإنتاج الفيديو.</p>
             </div>
 
             <div class="glass-panel p-8 rounded-3xl border border-white/10 max-w-5xl mx-auto shadow-2xl">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- 1. رفع الصور -->
+
+                    <!-- 1. الصور -->
                     <div class="relative group cursor-pointer">
-                        <input type="file" id="images-upload" multiple accept="image/*" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                        <input type="file" id="images-upload" multiple accept="image/jpeg,image/png,image/webp" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
                         <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-brand-primary transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-48">
                             <i class="fa-solid fa-images text-3xl text-brand-primary mb-3"></i>
                             <h4 class="font-bold text-lg mb-1">صور الفيديو</h4>
-                            <p class="text-xs text-gray-400">اختر صور متعددة (PNG, JPG)</p>
+                            <p class="text-xs text-gray-400">حتى 15 صورة (JPG, PNG, WEBP) — الترتيب حسب الرقم في اسم الملف</p>
                             <span id="images-status" class="mt-3 text-sm font-semibold text-brand-accent hidden"></span>
                         </div>
                     </div>
 
-                    <!-- 2. رفع الصوت -->
+                    <!-- 2. الصوت -->
                     <div class="relative group cursor-pointer">
                         <input type="file" id="audio-upload" accept="audio/*" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
                         <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-brand-secondary transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-48">
                             <i class="fa-solid fa-file-audio text-3xl text-brand-secondary mb-3"></i>
                             <h4 class="font-bold text-lg mb-1">التعليق الصوتي</h4>
-                            <p class="text-xs text-gray-400">اختر ملف صوتي (MP3, WAV)</p>
+                            <p class="text-xs text-gray-400">اختر ملف صوتي (MP3, WAV, M4A)</p>
                             <span id="audio-status" class="mt-3 text-sm font-semibold text-brand-accent hidden"></span>
                         </div>
                     </div>
 
-                    <!-- 3. رفع المقدمة -->
-                    <div class="relative group cursor-pointer">
-                        <input type="file" id="intro-upload" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
-                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-pink-500 transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-32">
-                            <i class="fa-solid fa-film text-2xl text-pink-500 mb-2"></i>
-                            <h4 class="font-bold mb-1">فيديو المقدمة (Intro)</h4>
-                            <span id="intro-status" class="text-xs text-brand-accent hidden"></span>
-                        </div>
+                    <!-- 3. المقدمة (ثابتة من السيرفر) -->
+                    <div class="p-6 rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center text-center h-32">
+                        <i class="fa-solid fa-film text-2xl text-pink-500 mb-2"></i>
+                        <h4 class="font-bold mb-1">فيديو المقدمة (Intro)</h4>
+                        <span class="text-xs text-gray-400">ثابتة من السيرفر (public/intro.mp4)</span>
                     </div>
 
-                    <!-- 4. رفع النهاية -->
-                    <div class="relative group cursor-pointer">
-                        <input type="file" id="outro-upload" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
-                        <div class="p-6 rounded-2xl border-2 border-dashed border-gray-600 group-hover:border-orange-500 transition-colors bg-white/5 flex flex-col items-center justify-center text-center h-32">
-                            <i class="fa-solid fa-clapperboard text-2xl text-orange-500 mb-2"></i>
-                            <h4 class="font-bold mb-1">فيديو النهاية (Outro)</h4>
-                            <span id="outro-status" class="text-xs text-brand-accent hidden"></span>
-                        </div>
+                    <!-- 4. النهاية (ثابتة من السيرفر) -->
+                    <div class="p-6 rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center text-center h-32">
+                        <i class="fa-solid fa-clapperboard text-2xl text-orange-500 mb-2"></i>
+                        <h4 class="font-bold mb-1">فيديو النهاية (Outro)</h4>
+                        <span class="text-xs text-gray-400">ثابتة من السيرفر (public/outro.mp4)</span>
                     </div>
 
                 </div>
@@ -235,43 +200,51 @@
                     <button id="trigger-render-btn" class="px-10 py-4 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-xl font-bold text-lg shadow-lg shadow-brand-primary/30 hover:shadow-brand-primary/50 transition-all hover:-translate-y-1 w-full md:w-auto">
                         <i class="fa-solid fa-gear mr-2"></i> دمج وإنشاء الفيديو الآن
                     </button>
-                    <p class="text-xs text-gray-500 mt-3">* سيتم إرسال الملفات إلى خوادم Node.js لمعالجتها باستخدام FFmpeg</p>
+                    <p class="text-xs text-gray-500 mt-3">* سيتم إرسال الملفات إلى خادم Node.js لمعالجتها باستخدام FFmpeg</p>
+                    <button id="reset-btn" class="hidden mt-4 text-sm text-gray-400 hover:text-white underline">
+                        إنشاء فيديو جديد
+                    </button>
                 </div>
             </div>
         </section>
 
-        <!-- قسم المحاكاة الحية (تأثير مرئي للرندرة) -->
+        <!-- سجل المعالجة الحي -->
         <section class="container mx-auto px-6 py-20">
             <div class="bg-black/50 border border-gray-800 rounded-3xl p-8 lg:p-12 text-center relative overflow-hidden glass-panel">
                 <div class="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-brand-secondary/5"></div>
-                <h3 class="text-3xl font-bold mb-8 relative z-10">شاهد محاكاة عملية المعالجة</h3>
-                
+                <h3 class="text-3xl font-bold mb-8 relative z-10">سجل عملية المعالجة</h3>
+
+                <!-- شريط التقدم -->
+                <div id="progress-wrap" class="max-w-3xl mx-auto mb-6 relative z-10 hidden">
+                    <div class="flex justify-between text-sm text-gray-300 mb-2">
+                        <span id="progress-label">جاري المعالجة...</span>
+                        <span id="progress-pct" dir="ltr">0%</span>
+                    </div>
+                    <div class="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full w-0 bg-gradient-to-r from-brand-primary to-brand-secondary transition-all duration-500"></div>
+                    </div>
+                </div>
+
                 <div class="max-w-3xl mx-auto bg-[#0d1117] rounded-xl border border-gray-700 shadow-2xl text-left overflow-hidden relative z-10" dir="ltr">
                     <div class="flex items-center px-4 py-2 bg-[#161b22] border-b border-gray-700">
                         <i class="fa-solid fa-terminal text-gray-400 mr-2 text-sm"></i>
                         <span class="text-xs text-gray-400 font-mono">Terminal - VideoForge</span>
                     </div>
                     <div class="p-4 font-mono text-sm h-64 overflow-y-auto" id="terminal-output">
-                        <div class="text-green-400">$ node generate-video.js --template=news_layout</div>
-                        <div class="text-gray-400 mt-1">[10:00:01] <span class="text-blue-400">info:</span> Initializing Puppeteer cluster...</div>
-                        <!-- سيتم إضافة المزيد من الأسطر هنا بواسطة جافاسكربت -->
+                        <div class="text-green-400">$ videoforge ready</div>
+                        <div class="text-gray-400 mt-1">اختر الصور والصوت ثم اضغط "دمج وإنشاء الفيديو".</div>
                     </div>
                 </div>
-                
-                <button id="start-render-btn" class="hidden mt-8 relative z-10 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors">
-                    <i class="fa-solid fa-play mr-2"></i> بدء عملية الرندرة الوهمية
-                </button>
             </div>
         </section>
 
-        <!-- الفوتر -->
         <footer class="border-t border-white/10 mt-20 pt-10 pb-6 glass-panel">
             <div class="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-video text-brand-primary"></i>
                     <span class="text-lg font-bold">Video<span class="text-brand-primary">Forge</span></span>
                 </div>
-                <p class="text-sm text-gray-500">تم التصميم باستخدام تقنيات الويب الحديثة لتوضيح قوة دمج Node.js و متصفحات الويب الوهمية.</p>
+                <p class="text-sm text-gray-500">تم التصميم باستخدام تقنيات الويب الحديثة و Node.js و FFmpeg.</p>
                 <div class="flex gap-4">
                     <a href="#" class="text-gray-400 hover:text-white transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>
                     <a href="#" class="text-gray-400 hover:text-white transition-colors"><i class="fa-brands fa-github text-xl"></i></a>
@@ -280,115 +253,195 @@
         </footer>
     </main>
 
-    <!-- سكربت المحاكاة (لإعطاء تأثير جمالي في واجهة التيرمينال) -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const terminalOutput = document.getElementById('terminal-output');
-            const startBtn = document.getElementById('start-render-btn'); // الزر القديم مخفي الآن
-            const triggerRenderBtn = document.getElementById('trigger-render-btn'); // الزر الجديد
-            
-            // إدارة اختيار الملفات لتحديث الواجهة
-            const handleFileInput = (inputId, statusId, isMultiple = false) => {
-                const input = document.getElementById(inputId);
-                const status = document.getElementById(statusId);
-                
-                input.addEventListener('change', (e) => {
-                    if(e.target.files.length > 0) {
-                        status.classList.remove('hidden');
-                        if(isMultiple) {
-                            status.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> تم اختيار ${e.target.files.length} صور`;
-                        } else {
-                            status.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> تم اختيار الملف: ${e.target.files[0].name.substring(0, 15)}...`;
-                        }
-                    }
-                });
+            // لو الصفحة مفتوحة من السيرفر نفسه نستخدم مسارات نسبية، ولو مفتوحة كملف نتصل بـ localhost
+            const API = location.protocol === 'file:' ? 'http://localhost:3000' : '';
+            const MAX_IMAGES = 15;
+            const POLL_MS = 2000;
+
+            const $ = (id) => document.getElementById(id);
+            const terminalOutput = $('terminal-output');
+            const renderBtn = $('trigger-render-btn');
+            const resetBtn = $('reset-btn');
+            const progressWrap = $('progress-wrap');
+            const progressBar = $('progress-bar');
+            const progressPct = $('progress-pct');
+            const progressLabel = $('progress-label');
+
+            const defaultBtnHtml = renderBtn.innerHTML;
+            const GRADIENTS = {
+                normal: ['from-brand-primary', 'to-brand-secondary'],
+                success: ['from-green-500', 'to-emerald-600'],
+                error: ['from-red-500', 'to-red-700']
             };
 
-            handleFileInput('images-upload', 'images-status', true);
-            handleFileInput('audio-upload', 'audio-status');
-            handleFileInput('intro-upload', 'intro-status');
-            handleFileInput('outro-upload', 'outro-status');
+            let isRunning = false;
+            let downloadUrl = null;
 
-            // دالة لإضافة نصوص للتيرمينال
-            const addLog = (text, className = "text-gray-400") => {
+            // ───── أدوات الواجهة ─────
+            const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+            const addLog = (html, className = 'text-gray-400') => {
                 const div = document.createElement('div');
                 div.className = `${className} mt-1`;
-                div.innerHTML = text;
+                div.innerHTML = html;
                 terminalOutput.appendChild(div);
                 terminalOutput.scrollTop = terminalOutput.scrollHeight;
             };
 
-            let isRunning = false;
+            const setGradient = (mode) => {
+                Object.values(GRADIENTS).flat().forEach((c) => renderBtn.classList.remove(c));
+                GRADIENTS[mode].forEach((c) => renderBtn.classList.add(c));
+            };
 
-            triggerRenderBtn.addEventListener('click', async () => {
+            const setBusy = (busy) => {
+                renderBtn.disabled = busy;
+                renderBtn.classList.toggle('opacity-50', busy);
+                renderBtn.classList.toggle('cursor-not-allowed', busy);
+            };
+
+            const setProgress = (pct, label) => {
+                progressWrap.classList.remove('hidden');
+                progressBar.style.width = pct + '%';
+                progressPct.textContent = pct + '%';
+                if (label) progressLabel.textContent = label;
+            };
+
+            // ───── اختيار الملفات ─────
+            const handleFileInput = (inputId, statusId, isMultiple = false) => {
+                const input = $(inputId);
+                const status = $(statusId);
+                input.addEventListener('change', (e) => {
+                    const files = e.target.files;
+                    if (!files.length) return;
+                    status.classList.remove('hidden');
+                    if (isMultiple) {
+                        const tooMany = files.length > MAX_IMAGES;
+                        status.className = `mt-3 text-sm font-semibold ${tooMany ? 'text-red-400' : 'text-brand-accent'}`;
+                        status.textContent = tooMany
+                            ? `تم اختيار ${files.length} صورة — الحد الأقصى ${MAX_IMAGES}`
+                            : `تم اختيار ${files.length} صور`;
+                    } else {
+                        const name = files[0].name;
+                        status.textContent = `تم اختيار الملف: ${name.length > 20 ? name.substring(0, 20) + '...' : name}`;
+                    }
+                });
+            };
+            handleFileInput('images-upload', 'images-status', true);
+            handleFileInput('audio-upload', 'audio-status');
+
+            // ───── متابعة المهمة من السيرفر ─────
+            async function pollJob(jobId) {
+                let lastLogged = -10;
+                let failures = 0;
+                while (true) {
+                    await sleep(POLL_MS);
+                    let job;
+                    try {
+                        const r = await fetch(`${API}/status/${jobId}`);
+                        if (r.status === 404) throw new Error('المهمة لم تعد موجودة على السيرفر (ربما أُعيد تشغيله)');
+                        job = await r.json();
+                        failures = 0;
+                    } catch (err) {
+                        if (err.message.startsWith('المهمة')) throw err;
+                        if (++failures >= 5) throw new Error('انقطع الاتصال بالسيرفر');
+                        continue; // نعيد المحاولة
+                    }
+
+                    if (job.status === 'queued') {
+                        setProgress(0, 'في الانتظار في الطابور...');
+                    } else if (job.status === 'processing') {
+                        setProgress(job.progress, 'جاري إنتاج الفيديو...');
+                        renderBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> جاري المعالجة ${job.progress}%`;
+                        if (job.progress - lastLogged >= 10) {
+                            lastLogged = job.progress;
+                            addLog(`[Server] <span class="text-yellow-400">process:</span> ${job.progress}%`);
+                        }
+                    } else if (job.status === 'done') {
+                        setProgress(100, 'اكتمل الفيديو');
+                        return job.downloadUrl;
+                    } else if (job.status === 'error') {
+                        throw new Error(job.error || 'فشل إنتاج الفيديو');
+                    }
+                }
+            }
+
+            // ───── الزر الرئيسي ─────
+            renderBtn.addEventListener('click', async () => {
+                // بعد الانتهاء الزر بيبقى زر تحميل
+                if (downloadUrl) {
+                    window.open(`${API}${downloadUrl}`, '_blank');
+                    return;
+                }
                 if (isRunning) return;
-                
-                const imageFiles = document.getElementById('images-upload').files;
-                const audioFile = document.getElementById('audio-upload').files[0];
-                const introFile = document.getElementById('intro-upload').files[0];
-                const outroFile = document.getElementById('outro-upload').files[0];
+
+                const imageFiles = $('images-upload').files;
+                const audioFile = $('audio-upload').files[0];
 
                 if (imageFiles.length === 0 || !audioFile) {
-                    alert("يرجى اختيار الصور وملف الصوت على الأقل!");
+                    alert('يرجى اختيار الصور وملف الصوت على الأقل!');
+                    return;
+                }
+                if (imageFiles.length > MAX_IMAGES) {
+                    alert(`الحد الأقصى ${MAX_IMAGES} صورة. اختر عدداً أقل.`);
                     return;
                 }
 
-                // التمرير السلس إلى قسم المحاكاة
-                document.getElementById('terminal-output').parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                $('terminal-output').parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
                 isRunning = true;
-                terminalOutput.innerHTML = `<div class="text-green-400">$ node generate-video.js --process=full_stack</div>`;
-                triggerRenderBtn.disabled = true;
-                triggerRenderBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                triggerRenderBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> جاري رفع الملفات ومعالجتها...';
+                terminalOutput.innerHTML = '<div class="text-green-400">$ videoforge render</div>';
+                setGradient('normal');
+                setBusy(true);
+                setProgress(0, 'جاري رفع الملفات...');
+                renderBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> جاري رفع الملفات...';
 
-                // إعداد البيانات للإرسال إلى الخادم الحقيقي
                 const formData = new FormData();
-                for (let i = 0; i < imageFiles.length; i++) {
-                    formData.append('images', imageFiles[i]);
-                }
+                for (const f of imageFiles) formData.append('images', f);
                 formData.append('audio', audioFile);
-                if (introFile) formData.append('intro', introFile);
-                if (outroFile) formData.append('outro', outroFile);
+                // المقدمة والخاتمة ثابتتان من السيرفر، فمش بنرفعهم
 
-                addLog("[Client] <span class='text-blue-400'>info:</span> جاري إرسال الملفات إلى خادم Node.js...", "text-gray-400");
+                addLog(`[Client] <span class="text-blue-400">info:</span> جاري إرسال ${imageFiles.length} صورة وملف الصوت إلى الخادم...`);
 
                 try {
-                    // الاتصال الحقيقي بخادم Node.js الخاص بنا
-                    const response = await fetch('http://localhost:3000/generate-video', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    const response = await fetch(`${API}/generate-video`, { method: 'POST', body: formData });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.error || 'حدث خطأ غير معروف');
 
-                    addLog("[Server] <span class='text-yellow-400'>process:</span> يتم الآن دمج الصور والصوت بواسطة FFmpeg...", "text-gray-400");
-                    
-                    const result = await response.json();
+                    addLog(`[Server] <span class="text-green-400">accepted:</span> ${escapeHtml(result.message)}`, 'text-green-400');
+                    setProgress(0, 'تم الاستلام، جاري المعالجة...');
 
-                    if (response.ok) {
-                        addLog(`[Server] <span class='text-green-400'>success:</span> ${result.message} 🚀`, "text-green-400");
-                        addLog(`[Client] <span class='text-brand-primary'>system:</span> الفيديو جاهز للتحميل.`);
-                        
-                        triggerRenderBtn.innerHTML = '<i class="fa-solid fa-download mr-2"></i> تحميل الفيديو النهائي';
-                        triggerRenderBtn.classList.replace('from-brand-primary', 'from-green-500');
-                        triggerRenderBtn.classList.replace('to-brand-secondary', 'to-emerald-600');
-                        triggerRenderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        triggerRenderBtn.disabled = false;
+                    downloadUrl = await pollJob(result.jobId);
 
-                        // تغيير وظيفة الزر ليقوم بتحميل الملف
-                        triggerRenderBtn.onclick = () => {
-                            window.open(`http://localhost:3000${result.downloadUrl}`, '_blank');
-                        };
-                    } else {
-                        throw new Error(result.error || 'حدث خطأ غير معروف');
-                    }
+                    addLog('[Server] <span class="text-green-400">success:</span> الفيديو جاهز للتحميل 🚀', 'text-green-400');
+                    renderBtn.innerHTML = '<i class="fa-solid fa-download mr-2"></i> تحميل الفيديو النهائي';
+                    setGradient('success');
+                    setBusy(false);
+                    resetBtn.classList.remove('hidden');
                 } catch (error) {
-                    addLog(`[Error] <span class='text-red-500'>فشل:</span> ${error.message}`, "text-red-400");
-                    triggerRenderBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> فشل العملية';
-                    triggerRenderBtn.classList.replace('from-brand-primary', 'from-red-500');
-                    triggerRenderBtn.classList.replace('to-brand-secondary', 'to-red-700');
+                    addLog(`[Error] <span class="text-red-500">فشل:</span> ${escapeHtml(error.message)}`, 'text-red-400');
+                    progressLabel.textContent = 'فشلت العملية';
+                    renderBtn.innerHTML = '<i class="fa-solid fa-rotate-right mr-2"></i> فشلت العملية — حاول مرة أخرى';
+                    setGradient('error');
+                    setBusy(false);
+                    downloadUrl = null;
                 } finally {
                     isRunning = false;
                 }
+            });
+
+            // ───── فيديو جديد ─────
+            resetBtn.addEventListener('click', () => {
+                downloadUrl = null;
+                ['images-upload', 'audio-upload'].forEach((id) => ($(id).value = ''));
+                ['images-status', 'audio-status'].forEach((id) => $(id).classList.add('hidden'));
+                progressWrap.classList.add('hidden');
+                renderBtn.innerHTML = defaultBtnHtml;
+                setGradient('normal');
+                resetBtn.classList.add('hidden');
+                terminalOutput.innerHTML = '<div class="text-green-400">$ videoforge ready</div>';
             });
         });
     </script>
